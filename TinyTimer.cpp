@@ -9,6 +9,7 @@
 #include"ProgramInfo.h"
 
 using namespace std;
+
 using ProgInfo::ProgramInfo;
 using ProgInfo::PrintTime;
 using ProgInfo::GetDiffSeconds;
@@ -22,7 +23,8 @@ void SetAbsLocate(int x, int y)
 };
 
 wstring GetCurrentName();
-bool TestTime();
+
+void printAllData(map<wstring, ProgramInfo> &ProgramMap);
 
 int main()
 {
@@ -34,38 +36,55 @@ int main()
 	PrintTime(wcout, LastTime);
 	map<wstring, ProgramInfo> ProgramMap;
 	ProgramMap.emplace(make_pair(LastName, ProgramInfo(LastName)));
+	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);      //获得标准输入设备句柄
+	INPUT_RECORD keyRec;        //定义输入事件结构体  
+	DWORD res;      //定义返回记录  
 
 	int i = 0;
 	while (1)
 	{
 		//通过封装Windows API来确定名字及时间
 		wstring CurrentName = GetCurrentName();
+
 		//根据名字判断是否是新程序，及更新durations
 		if (CurrentName != LastName)
 		{
 			GetLocalTime(&CurrentTime);
 			ProgramMap[LastName].InsertNewDuration(make_pair(LastTime, CurrentTime));
-			ProgramMap[LastName].SetName(LastName);    //由于LastName不存在map中时ProgramMap[LastName]会调用默认构造函数自动生成ProgramInfo，而默认构造函数对Name会生成""空串，因此必须额外加上SetName确保名字非空
+
+			/*由于LastName不存在map中时ProgramMap[LastName]会调用默认构造函数自动生成ProgramInfo
+			 *而默认构造函数对Name会生成""空串，因此必须额外加上SetName确保名字非空*/
+			ProgramMap[LastName].SetName(LastName);    
 			LastTime = CurrentTime;
 			LastName = CurrentName;
 		}
-		if (TestTime())
-			break;
+
+		//键盘响应
+		ReadConsoleInput(keyIn, &keyRec, 1, &res);      //读取输入事件  
+		if (keyRec.EventType == KEY_EVENT)              //如果当前事件是键盘事件  
+		{
+			if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false) //当前事件的虚拟键为Esc键，且是释放时响应
+			{
+				GetLocalTime(&CurrentTime);             //最后使用的软件写入记录
+				ProgramMap[LastName].InsertNewDuration(make_pair(LastTime, CurrentTime));
+				ProgramMap[LastName].SetName(LastName);
+				SetAbsLocate(0, 1);
+				printAllData(ProgramMap);
+				wcout << "End Time : ";
+				PrintTime(wcout, LastTime);
+				return 0;
+			}
+		}
+
 		//采样间隔
-		Sleep(1000);
-	}
-	GetLocalTime(&CurrentTime);  //最后使用的软件写入记录
-	ProgramMap[LastName].InsertNewDuration(make_pair(LastTime, CurrentTime));
-	ProgramMap[LastName].SetName(LastName);
-	SetAbsLocate(0, 1);
-	cout << "-----------------------------------------" << endl;
-	for (auto ch : ProgramMap)
-	{
-		wcout << ch.second << endl;
+		Sleep(100);
 	}
 	return 0;
 }
 
+/*获取当前运行的进程名称
+ *传入空参数，类型void
+ *返回进程名称，类型wstring*/
 wstring GetCurrentName()
 {
 	DWORD PID;
@@ -77,18 +96,12 @@ wstring GetCurrentName()
 	return CurrentName;
 }
 
-
-bool TestTime()
+void printAllData(map<wstring, ProgramInfo> &ProgramMap)
 {
-	SYSTEMTIME tmp{ 0 }, trg{ 0 };
-	GetLocalTime(&tmp);
-	trg = tmp;
-	trg.wHour = 15;
-	trg.wMinute = 58;
-	SetAbsLocate(0, 1);
-	wcout << GetDiffSeconds(tmp, trg) << "s remaining." << ends;
-	if (tmp.wHour == trg.wHour && tmp.wMinute == trg.wMinute)
-		return true;
-	else
-		return false;
+	cout << "-----------------------------------------" << endl;
+	for (auto ch : ProgramMap)
+	{
+		wcout << ch.second << endl;
+	}
+	cout << "-----------------------------------------" << endl;
 }
