@@ -7,101 +7,100 @@
 #include<string>
 #include<utility>
 #include"ProgramInfo.h"
+#include<cassert>
 
 using namespace std;
 
-using ProgInfo::ProgramInfo;
-using ProgInfo::PrintTime;
-using ProgInfo::GetDiffSeconds;
+using namespace TinyTimer;
+
+const int BUFSIZE = 255;
 
 void SetAbsLocate(int x, int y)
 {
 	COORD coord;
-	coord.X = x;        //´Óconsolo×óÉÏ½ÇÍùÓÒ£¬x´Ó0¿ªÊ¼
-	coord.Y = y;        //´Óconsolo×óÉÏ½ÇÍùÏÂ£¬y´Ó0¿ªÊ¼
+	coord.X = x;        //ä»consoloå·¦ä¸Šè§’å¾€å³ï¼Œxä»0å¼€å§‹
+	coord.Y = y;        //ä»consoloå·¦ä¸Šè§’å¾€ä¸‹ï¼Œyä»0å¼€å§‹
 	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 };
 
-wstring GetCurrentName();
-
-void printAllData(map<wstring, ProgramInfo> &ProgramMap);
+wstring getProgName();
+wstring getWindowTitle();
 
 int main()
 {
-	//³õÊ¼»¯ÆğÊ¼Ìõ¼ş
-	SYSTEMTIME CurrentTime{ 0 }, LastTime{ 0 };
-	wstring LastName = GetCurrentName();
-	GetLocalTime(&LastTime);
-	wcout << "Start Time : ";   //×¢Òâ£º¶ÔÓÚ¿í×Ö·û£¬setfillÒ²ÒªÒÔ¿í×Ö·ûÎªÊµ²Î
-	PrintTime(wcout, LastTime);
-	map<wstring, ProgramInfo> ProgramMap;
-	ProgramMap.emplace(make_pair(LastName, ProgramInfo(LastName)));
-	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);      //»ñµÃ±ê×¼ÊäÈëÉè±¸¾ä±ú
-	INPUT_RECORD keyRec;        //¶¨ÒåÊäÈëÊÂ¼ş½á¹¹Ìå  
-	DWORD res;      //¶¨Òå·µ»Ø¼ÇÂ¼  
+	std::locale::global(std::locale(""));  //C++å†™æ³•ï¼Œæ³¨æ„è¿™é‡Œï¼Œè®¾ç½®ç³»ç»Ÿç¯å¢ƒï¼Œå¤„ç†ä¸­æ–‡IOï¼Œè¿™æ˜¯Cçš„å†™æ³•
+	//åˆå§‹åŒ–èµ·å§‹æ¡ä»¶
+	SYSTEMTIME currentTime{ 0 }, lastTime{ 0 };
+	wstring lastName(getProgName());
+	wstring lastTitle(getWindowTitle());
+	GetLocalTime(&lastTime);
 
-	int i = 0;
-	while (1)
+	map<wstring, Program> ProgramMap;
+	ProgramMap.emplace(make_pair(lastName, Program(lastName)));
+	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);      //è·å¾—æ ‡å‡†è¾“å…¥è®¾å¤‡å¥æŸ„
+	INPUT_RECORD keyRec;        //å®šä¹‰è¾“å…¥äº‹ä»¶ç»“æ„ä½“  
+	DWORD res;      //å®šä¹‰è¿”å›è®°å½•  
+	wcout << lastName << " -> " << lastTitle << endl;
+	while (true)
 	{
-		//Í¨¹ı·â×°Windows APIÀ´È·¶¨Ãû×Ö¼°Ê±¼ä
-		wstring CurrentName = GetCurrentName();
-
-		//¸ù¾İÃû×ÖÅĞ¶ÏÊÇ·ñÊÇĞÂ³ÌĞò£¬¼°¸üĞÂdurations
-		if (CurrentName != LastName)
+		//é€šè¿‡å°è£…Windows APIæ¥ç¡®å®šè¿›ç¨‹ååŠçª—å£æ ‡é¢˜
+		wstring currentName(getProgName());
+		wstring currentTitle(getWindowTitle());
+		wcout << currentName << " -> " << currentTitle << endl;
+		//æ ¹æ®åå­—åˆ¤æ–­æ˜¯å¦æ˜¯æ–°ç¨‹åºæˆ–æ–°çª—å£ï¼ŒåŠæ›´æ–°durations
+		if (currentName != lastName)
 		{
-			GetLocalTime(&CurrentTime);
-			ProgramMap[LastName].InsertNewDuration(make_pair(LastTime, CurrentTime));
-
-			/*ÓÉÓÚLastName²»´æÔÚmapÖĞÊ±ProgramMap[LastName]»áµ÷ÓÃÄ¬ÈÏ¹¹Ôìº¯Êı×Ô¶¯Éú³ÉProgramInfo
-			 *¶øÄ¬ÈÏ¹¹Ôìº¯Êı¶ÔName»áÉú³É""¿Õ´®£¬Òò´Ë±ØĞë¶îÍâ¼ÓÉÏSetNameÈ·±£Ãû×Ö·Ç¿Õ*/
-			ProgramMap[LastName].SetName(LastName);    
-			LastTime = CurrentTime;
-			LastName = CurrentName;
-		}
-
-		//¼üÅÌÏìÓ¦
-		ReadConsoleInput(keyIn, &keyRec, 1, &res);      //¶ÁÈ¡ÊäÈëÊÂ¼ş  
-		if (keyRec.EventType == KEY_EVENT)              //Èç¹ûµ±Ç°ÊÂ¼şÊÇ¼üÅÌÊÂ¼ş  
-		{
-			if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false) //µ±Ç°ÊÂ¼şµÄĞéÄâ¼üÎªEsc¼ü£¬ÇÒÊÇÊÍ·ÅÊ±ÏìÓ¦
+			GetLocalTime(&currentTime);
+			if (ProgramMap.find(lastName) == ProgramMap.end())   
 			{
-				GetLocalTime(&CurrentTime);             //×îºóÊ¹ÓÃµÄÈí¼şĞ´Èë¼ÇÂ¼
-				ProgramMap[LastName].InsertNewDuration(make_pair(LastTime, CurrentTime));
-				ProgramMap[LastName].SetName(LastName);
-				SetAbsLocate(0, 1);
-				printAllData(ProgramMap);
-				wcout << "End Time : ";
-				PrintTime(wcout, LastTime);
-				return 0;
+				ProgramMap.emplace(make_pair(lastName, Program(lastName)));   //ä¸åŠ std::moveä¼šå¯¼è‡´é”™è¯¯
 			}
+			if (ProgramMap.at(lastName).findView(lastTitle) == nullptr)
+			{
+				ProgramMap.at(lastName).addView(lastTitle);
+			}
+			ProgramMap.at(lastName).findView(lastTitle)->addDuration(lastTime, currentTime);
+			lastTime = currentTime;
+			lastName = currentName;
 		}
-
-		//²ÉÑù¼ä¸ô
+		
+		
+		//é”®ç›˜å“åº”
+		//ReadConsoleInput(keyIn, &keyRec, 1, &res);      //è¯»å–è¾“å…¥äº‹ä»¶  
+		//if (keyRec.EventType == KEY_EVENT)              //å¦‚æœå½“å‰äº‹ä»¶æ˜¯é”®ç›˜äº‹ä»¶  
+		//{
+		//	if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false) //å½“å‰äº‹ä»¶çš„è™šæ‹Ÿé”®ä¸ºEscé”®ï¼Œä¸”æ˜¯é‡Šæ”¾æ—¶å“åº”
+		//	{
+		//		wcout << "end" << endl;
+		//		return 0;
+		//	}
+		//}
+		
+		//é‡‡æ ·é—´éš”
 		Sleep(100);
 	}
 	return 0;
 }
 
-/*»ñÈ¡µ±Ç°ÔËĞĞµÄ½ø³ÌÃû³Æ
- *´«Èë¿Õ²ÎÊı£¬ÀàĞÍvoid
- *·µ»Ø½ø³ÌÃû³Æ£¬ÀàĞÍwstring*/
-wstring GetCurrentName()
+/*è·å–å½“å‰è¿è¡Œçš„è¿›ç¨‹åç§°
+ *ä¼ å…¥ç©ºå‚æ•°ï¼Œç±»å‹void
+ *è¿”å›è¿›ç¨‹åç§°ï¼Œç±»å‹wstring*/
+wstring getProgName()
 {
 	DWORD PID;
 	GetWindowThreadProcessId(GetForegroundWindow(), &PID);
-	WCHAR Path[MAX_PATH] = { 0 };
+	WCHAR name[MAX_PATH] = { 0 };
 	HANDLE hPID = OpenProcess(PROCESS_ALL_ACCESS, 0, PID);
-	GetModuleBaseName(hPID, NULL, Path, sizeof(Path));
-	wstring CurrentName(Path);
-	return CurrentName;
+	GetModuleBaseName(hPID, NULL, name, sizeof(name));
+	return wstring(name);
 }
 
-void printAllData(map<wstring, ProgramInfo> &ProgramMap)
+/*è·å–å½“å‰è¿è¡Œè¿›ç¨‹å½“å‰çª—å£åç§°
+ *ä¼ å…¥ç©ºå‚æ•°ï¼Œç±»å‹void
+ *è¿”å›è¿›ç¨‹åç§°ï¼Œç±»å‹wstring*/
+wstring getWindowTitle()
 {
-	cout << "-----------------------------------------" << endl;
-	for (auto ch : ProgramMap)
-	{
-		wcout << ch.second << endl;
-	}
-	cout << "-----------------------------------------" << endl;
+	WCHAR title[BUFSIZE];
+	GetWindowText(GetForegroundWindow(), title, sizeof(title));
+	return wstring(title);
 }

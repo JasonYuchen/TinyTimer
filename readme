@@ -3,3 +3,4 @@ I'm interested in how much time I spend on different apps everyday.
 In fact I found a useful app named ManicTime which exactly meets my demand, but I still want to have fun coding.
 
 v0.01 a very simple trial
+v0.02 incompleted refactoring of v0.01, I try to use 2 classes to represent different apps and different windows of one app
