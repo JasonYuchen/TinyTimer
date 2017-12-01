@@ -32,6 +32,7 @@ int main()
 	//初始化起始条件
 	SYSTEMTIME currentTime{ 0 }, lastTime{ 0 };
 	wstring lastName(getProgName());
+	wstring cmd(lastName);
 	wstring lastTitle(getWindowTitle());
 	GetLocalTime(&lastTime);
 
@@ -64,21 +65,25 @@ int main()
 			lastName = currentName;
 		}
 		
-		
-		//键盘响应
-		//ReadConsoleInput(keyIn, &keyRec, 1, &res);      //读取输入事件  
-		//if (keyRec.EventType == KEY_EVENT)              //如果当前事件是键盘事件  
-		//{
-		//	if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false) //当前事件的虚拟键为Esc键，且是释放时响应
-		//	{
-		//		wcout << "end" << endl;
-		//		return 0;
-		//	}
-		//}
+		if (currentName == cmd)
+		{
+			//键盘响应
+			ReadConsoleInput(keyIn, &keyRec, 1, &res);      //读取输入事件  
+			if (keyRec.EventType == KEY_EVENT)              //如果当前事件是键盘事件  
+			{
+				if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false) //当前事件的虚拟键为Esc键，且是释放时响应
+				{
+					wcout << "end" << endl;
+					break;
+				}
+			}
+		}
+
 		
 		//采样间隔
 		Sleep(100);
 	}
+
 	return 0;
 }
 
