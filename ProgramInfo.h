@@ -48,7 +48,7 @@ namespace TinyTimer
 		void printAll() const;
 	private:
 		wstring title;
-		shared_ptr<const Program> prog;
+		const Program *prog;                    //cannot use shared_ptr/unique_ptr, which would cause circular reference
 		set<Value_type> durations;
 	};
 	bool operator< (const Program &lhs, const Program &rhs);
