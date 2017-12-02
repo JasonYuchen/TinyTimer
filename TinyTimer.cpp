@@ -7,7 +7,8 @@
 #include<string>
 #include<utility>
 #include"ProgramInfo.h"
-#include<cassert>
+#include<algorithm>
+#include<stdexcept>
 
 using namespace std;
 
@@ -15,81 +16,40 @@ using namespace TinyTimer;
 
 const int BUFSIZE = 255;
 
-void SetAbsLocate(int x, int y)
-{
-	COORD coord;
-	coord.X = x;        //从consolo左上角往右，x从0开始
-	coord.Y = y;        //从consolo左上角往下，y从0开始
-	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
-};
-
 wstring getProgName();
 wstring getWindowTitle();
+void handleKeyboardEvent();
+int startTimer(map<wstring, Program> &ProgramMap);
 
 int main()
 {
-	std::locale::global(std::locale(""));  //C++写法，注意这里，设置系统环境，处理中文IO，这是C的写法
-	//初始化起始条件
-	SYSTEMTIME currentTime{ 0 }, lastTime{ 0 };
-	wstring lastName(getProgName());
-	wstring cmd(lastName);
-	wstring lastTitle(getWindowTitle());
-	GetLocalTime(&lastTime);
-
+	std::locale::global(std::locale(""));
 	map<wstring, Program> ProgramMap;
-	ProgramMap.emplace(make_pair(lastName, Program(lastName)));
-	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);      //获得标准输入设备句柄
-	INPUT_RECORD keyRec;        //定义输入事件结构体  
-	DWORD res;      //定义返回记录  
-	wcout << lastName << " -> " << lastTitle << endl;
-	while (true)
+	try
 	{
-		//通过封装Windows API来确定进程名及窗口标题
-		wstring currentName(getProgName());
-		wstring currentTitle(getWindowTitle());
-		wcout << currentName << " -> " << currentTitle << endl;
-		//根据名字判断是否是新程序或新窗口，及更新durations
-		if (currentName != lastName)
-		{
-			GetLocalTime(&currentTime);
-			if (ProgramMap.find(lastName) == ProgramMap.end())   
-			{
-				ProgramMap.emplace(make_pair(lastName, Program(lastName)));   //不加std::move会导致错误
-			}
-			if (ProgramMap.at(lastName).findView(lastTitle) == nullptr)
-			{
-				ProgramMap.at(lastName).addView(lastTitle);
-			}
-			ProgramMap.at(lastName).findView(lastTitle)->addDuration(lastTime, currentTime);
-			lastTime = currentTime;
-			lastName = currentName;
-		}
-		
-		if (currentName == cmd)
-		{
-			//键盘响应
-			ReadConsoleInput(keyIn, &keyRec, 1, &res);      //读取输入事件  
-			if (keyRec.EventType == KEY_EVENT)              //如果当前事件是键盘事件  
-			{
-				if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false) //当前事件的虚拟键为Esc键，且是释放时响应
-				{
-					wcout << "end" << endl;
-					break;
-				}
-			}
-		}
-
-		
-		//采样间隔
-		Sleep(100);
+		startTimer(ProgramMap);               //focus on the console and push "Esc" to stop and print all logs
 	}
+	catch (wstring msg)
+	{
+		wcout << msg << endl;
+		if (msg == L"esc")
+		{
+			std::for_each(ProgramMap.cbegin(), ProgramMap.cend(), [](decltype(*ProgramMap.cbegin()) it) { it.second.printAll(); });
+		}
+	}
+	
 
 	return 0;
 }
 
-/*获取当前运行的进程名称
- *传入空参数，类型void
- *返回进程名称，类型wstring*/
+void SetAbsLocate(int x, int y)
+{
+	COORD coord;
+	coord.X = x;
+	coord.Y = y;  
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+};
+
 wstring getProgName()
 {
 	DWORD PID;
@@ -100,12 +60,70 @@ wstring getProgName()
 	return wstring(name);
 }
 
-/*获取当前运行进程当前窗口名称
- *传入空参数，类型void
- *返回进程名称，类型wstring*/
 wstring getWindowTitle()
 {
 	WCHAR title[BUFSIZE];
 	GetWindowText(GetForegroundWindow(), title, sizeof(title));
 	return wstring(title);
+}
+
+void handleKeyboardEvent()
+{
+	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);
+	INPUT_RECORD keyRec;
+	DWORD res;
+	ReadConsoleInput(keyIn, &keyRec, 1, &res);
+	if (keyRec.EventType == KEY_EVENT)
+	{
+		if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false)
+		{
+			throw(wstring(L"esc"));
+		}
+	}
+}
+
+int startTimer(map<wstring, Program> &ProgramMap)
+{
+	SYSTEMTIME currentTime{ 0 }, lastTime{ 0 };
+	wstring lastName(getProgName());
+	wstring cmd(lastName);
+	wstring lastTitle(getWindowTitle());
+	GetLocalTime(&lastTime);
+
+	ProgramMap.emplace(make_pair(lastName, Program(lastName)));
+	wcout << "Start Time : " << lastTime << endl;
+	while (true)
+	{
+
+		wstring currentName(getProgName());
+		wstring currentTitle(getWindowTitle());
+		SetAbsLocate(0, 1);
+		wcout << "Current Time : " << currentTime << endl;
+
+		//when new program or new view is running, log the last program or view
+		if (currentName != lastName && currentName != L"")
+		{
+			GetLocalTime(&currentTime);
+			if (ProgramMap.find(lastName) == ProgramMap.end())
+			{
+				ProgramMap.emplace(make_pair(lastName, Program(lastName)));
+			}
+			if (ProgramMap.at(lastName).findView(lastTitle) == nullptr)   //use at() to avoid the side effect of [], at() also have parameter check
+			{
+				ProgramMap.at(lastName).addView(lastTitle);
+			}
+			ProgramMap.at(lastName).findView(lastTitle)->addDuration(lastTime, currentTime);
+			lastTime = currentTime;
+			lastName = currentName;
+			lastTitle = currentTitle;
+		}
+
+		//when focus on TinyTimer, prepare for keyboard event. However this stops the timer, which will be sovled by multithread laterly
+		if (currentName == cmd)
+		{
+			handleKeyboardEvent();
+		}
+		Sleep(100);
+	}
+	return 0;
 }
