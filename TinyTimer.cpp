@@ -1,25 +1,20 @@
 #include<iostream>
-#include<iomanip>
-#include<Windows.h>
-#include<psapi.h>
 #include<vector>
 #include<map>
 #include<string>
 #include<utility>
-#include"ProgramInfo.h"
 #include<algorithm>
 #include<stdexcept>
+
+#include"Program.h"
+#include"PlatformAPI.h"
 
 using namespace std;
 
 using namespace TinyTimer;
 
-const int BUFSIZE = 255;
-
-wstring getProgName();
-wstring getWindowTitle();
-void handleKeyboardEvent();
 int startTimer(map<wstring, Program> &ProgramMap);
+void handleKeyboardEvent();
 
 int main()
 {
@@ -31,56 +26,15 @@ int main()
 	}
 	catch (wstring msg)
 	{
-		wcout << msg << endl;
 		if (msg == L"esc")
 		{
+			wcout << endl;
 			std::for_each(ProgramMap.cbegin(), ProgramMap.cend(), [](decltype(*ProgramMap.cbegin()) it) { it.second.printAll(); });
 		}
 	}
-	
-
 	return 0;
 }
 
-void SetAbsLocate(int x, int y)
-{
-	COORD coord;
-	coord.X = x;
-	coord.Y = y;  
-	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
-};
-
-wstring getProgName()
-{
-	DWORD PID;
-	GetWindowThreadProcessId(GetForegroundWindow(), &PID);
-	WCHAR name[MAX_PATH] = { 0 };
-	HANDLE hPID = OpenProcess(PROCESS_ALL_ACCESS, 0, PID);
-	GetModuleBaseName(hPID, NULL, name, sizeof(name));
-	return wstring(name);
-}
-
-wstring getWindowTitle()
-{
-	WCHAR title[BUFSIZE];
-	GetWindowText(GetForegroundWindow(), title, sizeof(title));
-	return wstring(title);
-}
-
-void handleKeyboardEvent()
-{
-	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);
-	INPUT_RECORD keyRec;
-	DWORD res;
-	ReadConsoleInput(keyIn, &keyRec, 1, &res);
-	if (keyRec.EventType == KEY_EVENT)
-	{
-		if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false)
-		{
-			throw(wstring(L"esc"));
-		}
-	}
-}
 
 int startTimer(map<wstring, Program> &ProgramMap)
 {
@@ -98,10 +52,9 @@ int startTimer(map<wstring, Program> &ProgramMap)
 		wstring currentName(getProgName());
 		wstring currentTitle(getWindowTitle());
 		SetAbsLocate(0, 1);
-		wcout << "Current Time : " << currentTime << endl;
 
 		//when new program or new view is running, log the last program or view
-		if (currentName != lastName && currentName != L"")
+		if (currentName != lastName && currentName != L"" || currentTitle != lastTitle && currentTitle != L"")
 		{
 			GetLocalTime(&currentTime);
 			if (ProgramMap.find(lastName) == ProgramMap.end())
@@ -126,4 +79,19 @@ int startTimer(map<wstring, Program> &ProgramMap)
 		Sleep(100);
 	}
 	return 0;
+}
+
+void handleKeyboardEvent()
+{
+	HANDLE keyIn = GetStdHandle(STD_INPUT_HANDLE);
+	INPUT_RECORD keyRec;
+	DWORD res;
+	ReadConsoleInput(keyIn, &keyRec, 1, &res);
+	if (keyRec.EventType == KEY_EVENT)
+	{
+		if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false)
+		{
+			throw(wstring(L"esc"));
+		}
+	}
 }
