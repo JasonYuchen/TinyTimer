@@ -5,6 +5,7 @@
 #include<utility>
 #include<algorithm>
 #include<stdexcept>
+#include<fstream>
 
 #include"Program.h"
 #include"PlatformAPI.h"
@@ -20,16 +21,29 @@ int main()
 {
 	std::locale::global(std::locale(""));
 	map<wstring, Program> ProgramMap;
-	try
+	while (true)
 	{
-		startTimer(ProgramMap);               //focus on the console and push "Esc" to stop and print all logs
-	}
-	catch (wstring msg)
-	{
-		if (msg == L"esc")
+		try
 		{
-			wcout << endl;
-			std::for_each(ProgramMap.cbegin(), ProgramMap.cend(), [](decltype(*ProgramMap.cbegin()) it) { it.second.printAll(); });
+			startTimer(ProgramMap);               //focus on the console and push "Esc" to stop and print all logs
+		}
+		catch (wstring msg)
+		{
+			if (msg == L"esc")
+			{
+				wcout << endl;
+				std::for_each(ProgramMap.cbegin(), ProgramMap.cend(), [](decltype(*ProgramMap.cbegin()) it) { it.second.printAll(wcout); });
+				break;
+			}
+			else if (msg == L"save")              //file IO
+			{
+				SYSTEMTIME now;
+				GetLocalTime(&now);
+				wstring filepath(to_wstring(now.wYear) + to_wstring(now.wMonth) + to_wstring(now.wDay));
+				wofstream save(filepath + L".txt");
+				std::for_each(ProgramMap.cbegin(), ProgramMap.cend(), [&](decltype(*ProgramMap.cbegin()) it) { it.second.printAll(save); });
+				wcout << L"Save to " << filepath << L".txt completed!" << endl;
+			}
 		}
 	}
 	return 0;
@@ -43,15 +57,16 @@ int startTimer(map<wstring, Program> &ProgramMap)
 	wstring cmd(lastName);
 	wstring lastTitle(getWindowTitle());
 	GetLocalTime(&lastTime);
-
-	ProgramMap.emplace(make_pair(lastName, Program(lastName)));
-	wcout << "Start Time : " << lastTime << endl;
+	if (ProgramMap.empty())
+	{
+		ProgramMap.emplace(make_pair(lastName, Program(lastName)));
+		wcout << "Start Time : " << lastTime << endl;
+	}
 	while (true)
 	{
 
 		wstring currentName(getProgName());
 		wstring currentTitle(getWindowTitle());
-		SetAbsLocate(0, 1);
 
 		//when new program or new view is running, log the last program or view
 		if (currentName != lastName && currentName != L"" || currentTitle != lastTitle && currentTitle != L"")
@@ -92,6 +107,10 @@ void handleKeyboardEvent()
 		if (keyRec.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE && keyRec.Event.KeyEvent.bKeyDown == false)
 		{
 			throw(wstring(L"esc"));
+		}
+		if (keyRec.Event.KeyEvent.wVirtualKeyCode == 'S' && keyRec.Event.KeyEvent.bKeyDown == false)
+		{
+			throw(wstring(L"save"));
 		}
 	}
 }

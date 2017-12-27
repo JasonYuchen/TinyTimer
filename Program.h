@@ -5,6 +5,7 @@
 #include<Windows.h>
 #include<utility>
 #include<set>
+#include<iostream>
 
 namespace TinyTimer
 {
@@ -12,24 +13,25 @@ namespace TinyTimer
 	using std::wstring;
 	using std::pair;
 	using std::set;
+	using std::wostream;
 	class Window;
 	class Program
 	{
 	public:
 		Program() = delete;
 		Program(const Program &) = delete;
-		Program(Program &&rhs) :name(std::move(rhs.name)), views(std::move(rhs.views)) {}
+		Program(Program &&rhs);
 		Program &operator=(const Program &) = delete;
-		Program &operator=(Program &&rhs) { name = std::move(rhs.name); views = std::move(rhs.views); }
-		explicit Program(const wstring &rhs) :name(rhs), views() {}
-		~Program() {}
+		Program &operator=(Program &&rhs);
+		explicit Program(const wstring &rhs);
+		~Program();
 
 		shared_ptr<Window> findView(const wstring &rhs);
 		Program &addView(const wstring &rhs);
-		wstring getName() const { return name; }
+		wstring getName() const;
 		size_t totalTimes() const;
 		size_t totalDuration() const;
-		void printAll() const;
+		wostream &printAll(wostream &os) const;
 	private:
 		wstring name;
 		set<shared_ptr<Window>> views;
@@ -41,18 +43,18 @@ namespace TinyTimer
 		using Value_type = pair<SYSTEMTIME, SYSTEMTIME>;
 		Window() = delete;
 		Window(const Window &) = delete;
-		Window(Window &&rhs) :title(std::move(rhs.title)), prog(std::move(rhs.prog)), durations(std::move(rhs.durations)) {}
+		Window(Window &&rhs);
 		Window &operator=(const Window &) = delete;
-		Window &operator=(Window &&rhs) { title = std::move(rhs.title); prog = std::move(rhs.prog); durations = std::move(rhs.durations); }
-		explicit Window(const wstring &rhs, const Program *p) :title(rhs), prog(p), durations() {}
-		~Window() {}
+		Window &operator=(Window &&rhs);
+		explicit Window(const wstring &rhs, const Program *p);
+		~Window();
 
-		wstring getTitle() const { return title; }
-		wstring getProgName() const { return prog->getName(); }
-		Window &addDuration(const SYSTEMTIME &lhs, const SYSTEMTIME &rhs) { durations.emplace(std::make_pair(lhs, rhs)); return *this; }
+		wstring getTitle() const;
+		wstring getProgName() const;
+		Window &addDuration(const SYSTEMTIME &lhs, const SYSTEMTIME &rhs);
 		size_t totalTimes() const;
 		size_t totalDuration() const;
-		void printAll() const;
+		wostream &printAll(wostream &os) const;
 	private:
 		wstring title;
 		const Program *prog;                    //cannot use shared_ptr/unique_ptr, which would cause circular reference

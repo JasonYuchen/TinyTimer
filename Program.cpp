@@ -1,6 +1,7 @@
 #include<iostream>
 #include<iomanip>
 #include<algorithm>
+#include<string>
 
 #include"Program.h"
 #include"PlatformAPI.h"
@@ -15,6 +16,12 @@ namespace TinyTimer
 	{
 		return lhs.getTitle() < rhs.getTitle();
 	}
+
+	Program::Program(Program &&rhs) :name(std::move(rhs.name)), views(std::move(rhs.views)) {}
+	Program &Program::operator=(Program &&rhs) { name = std::move(rhs.name); views = std::move(rhs.views); return *this; }
+	Program::Program(const wstring &rhs) :name(rhs), views() {}
+	Program::~Program() {}
+
 	shared_ptr<Window> Program::findView(const wstring &rhs)
 	{
 		for (auto v : views)
@@ -29,6 +36,28 @@ namespace TinyTimer
 		views.emplace(shared_ptr<Window>(new Window(rhs, this))); 
 		return *this;
 	}
+	wstring Program::getName() const 
+	{ 
+		return name; 
+	}
+
+	Window::Window(Window &&rhs) :title(std::move(rhs.title)), prog(std::move(rhs.prog)), durations(std::move(rhs.durations)) {}
+	Window &Window::operator=(Window &&rhs) { title = std::move(rhs.title); prog = std::move(rhs.prog); durations = std::move(rhs.durations); return *this; }
+	Window::Window(const wstring &rhs, const Program *p) :title(rhs), prog(p), durations() {}
+	Window::~Window() {};
+	wstring Window::getTitle() const 
+	{ 
+		return title; 
+	}
+	wstring Window::getProgName() const 
+	{ 
+		return prog->getName(); 
+	}
+	Window &Window::addDuration(const SYSTEMTIME &lhs, const SYSTEMTIME &rhs) 
+	{ 
+		durations.emplace(std::make_pair(lhs, rhs)); 
+		return *this; 
+	}
 	size_t Window::totalTimes() const
 	{
 		return durations.size();
@@ -39,20 +68,20 @@ namespace TinyTimer
 		std::for_each(durations.cbegin(), durations.cend(), [&ret](decltype(*durations.cbegin()) it) { ret += GetDiffSeconds(it.first, it.second); });
 		return ret;
 	}
-	void Window::printAll() const
+	wostream &Window::printAll(wostream &os) const
 	{
-		using std::wcout;
 		using std::endl;
-		wcout << title << endl;
+		os << title << endl;
 		int time = 0;
 		for (auto i : durations)
 		{
 			int tmp = GetDiffSeconds(i.first, i.second);
-			wcout << i.first << " " << i.second << " " << tmp << "s" << endl;
+			os << i.first << " " << i.second << " " << tmp << "s" << endl;
 			time += tmp;
 		}
-		wcout << "Window Times  = " << durations.size() << " Window Duration  = " << time << "s" << endl;
-		wcout << "----------------------------------------" << endl;
+		os << "Window Times  = " << durations.size() << " Window Duration  = " << time << "s" << endl;
+		os << "----------------------------------------" << endl;
+		return os;
 	}
 	size_t Program::totalTimes() const
 	{
@@ -66,17 +95,17 @@ namespace TinyTimer
 		std::for_each(views.cbegin(), views.cend(), [&ret](decltype(*views.cbegin()) it) { ret += it->totalDuration(); });
 		return ret;
 	}
-	void Program::printAll() const
+	wostream &Program::printAll(wostream &os) const
 	{
-		using std::wcout;
 		using std::endl;
-		wcout << name << endl;
-		wcout << "----------------------------------------" << endl;
+		os << name << endl;
+		os << "----------------------------------------" << endl;
 		for (auto i : views)
 		{
-			i->printAll();
+			i->printAll(os);
 		}
-		wcout << "Program Times = " << totalTimes() << " Program Duration = " << totalDuration() << "s" << endl;
-		wcout << endl;
+		os << "Program Times = " << totalTimes() << " Program Duration = " << totalDuration() << "s" << endl;
+		os << endl;
+		return os;
 	}
 }
