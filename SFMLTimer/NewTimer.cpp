@@ -7,7 +7,11 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <utility>
+#include <tuple>
 using namespace std;
+
+/* Caution : changing system time may freeze the application */
 
 condition_variable cv;
 mutex mtx;
@@ -79,11 +83,11 @@ wstring manio(size_t val, size_t size, char fill = '0')
 array<wstring, 4> sfTimeToHMS(const sf::Time &time)
 {
 	int millisec, sec, min, hour;
-	millisec = time.asMilliseconds() % 1000;
+	millisec = time.asMilliseconds();
 	sfTimeToSecond(time, sec);
 	sfTimeToMinute(time, min);
 	sfTimeToHour(time, hour);
-	return{ manio(hour,2), manio(min,2), manio(sec,2), manio(millisec,3) };
+	return{ manio(hour,2), manio(min % 60 ,2), manio(sec % 60 ,2), manio(millisec % 1000,3) };
 }
 int main()
 {
@@ -95,16 +99,44 @@ int main()
 	sf::RectangleShape background(sf::Vector2f(initBackGroundSizeX, initBackGroundSizeY));
 	background.setFillColor(sf::Color(102, 102, 102));
 
+	vector<pair<wstring, tuple<unsigned int, float, float, float, sf::Color>>> texts = {  // tuple<fontsize, posX, posY, rot, color>
+		{ L"–° ±",	{ 55,150, 20,  0,sf::Color::White } },
+		{ L"∑÷÷”",	{ 55,150, 80,  0,sf::Color::White } },
+		{ L"√Î",		{ 55, 80,140,  0,sf::Color::White } },
+		{ L"∫¡√Î",	{ 20,100,200,  0,sf::Color::White } },
+		{ L"√˛",		{ 55,  0,  0,  0,sf::Color::White } },
+		{ L"”„",		{ 55,  0, 50,  0,sf::Color::White } },
+		{ L"RESET", { 55,600,200,270,sf::Color::White } }
+	};
+
 	sf::Font font;
 	if (!font.loadFromFile("C:/Windows/Fonts/simhei.ttf"))
 	{
 		//error
 	}
-	sf::Text text;
-	text.setFont(font);
-	text.setCharacterSize(initFontSize);
-	text.setFillColor(sf::Color::White);
-	text.setPosition(sf::Vector2f(initFontPosX, initFontPosY));
+	vector<sf::Text> text(7);
+	vector<sf::Text> timetext(4);
+
+	// init texts' font, fontsize, position, rotation, color
+	auto i = 0;
+	for_each(text.begin(), text.end(), [&](sf::Text &rhs) {
+		rhs.setFont(font); 
+		rhs.setCharacterSize(std::get<0>(texts[i].second));
+		rhs.setPosition(sf::Vector2f(std::get<1>(texts[i].second), std::get<2>(texts[i].second)));
+		rhs.setRotation(std::get<3>(texts[i].second));
+		rhs.setFillColor(std::get<4>(texts[i].second));
+		rhs.setString(texts[i].first);
+		++i;
+	});
+	i = 0;
+	for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
+		rhs.setFont(font);
+		rhs.setCharacterSize(std::get<0>(texts[i].second));
+		rhs.setPosition(sf::Vector2f(std::get<1>(texts[i].second) - 50, std::get<2>(texts[i].second)));
+		rhs.setRotation(std::get<3>(texts[i].second));
+		rhs.setFillColor(std::get<4>(texts[i].second));
+		++i;
+	});
 
 	thread timerThread(Timer);
 	timerThread.detach();
@@ -115,7 +147,14 @@ int main()
 	{
 		sf::Event event;
 		time = sfTimeToHMS(curTime);
-		text.setString(time[0] + L"–° ±" + time[1] + L"∑÷÷”" + time[2] + L"√Î" + time[3] + L"∫¡√Î");
+
+		// update time texts
+		i = 0;
+		for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
+			rhs.setString(time[i]);
+			++i;
+		});
+
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
@@ -126,6 +165,16 @@ int main()
 			{
 				eventFlag = 1;
 				cv.notify_one();
+				if (text[4].getString() == L"√˛")
+				{
+					text[4].setString(L"º¶");
+					text[5].setString(L"—™");
+				}
+				else
+				{
+					text[4].setString(L"√˛");
+					text[5].setString(L"”„");
+				}
 			}
 			else if (event.type == sf::Event::Resized)
 			{
@@ -144,8 +193,9 @@ int main()
 					factor = static_cast<double>(align) / initBackGroundSizeX;
 				}
 				background.setScale(sf::Vector2f(initBackGroundSizeX * factor, initBackGroundSizeY * factor));
-				text.setCharacterSize(static_cast<unsigned int>(initFontSize * factor));
-				text.setPosition(sf::Vector2f(initFontPosX * factor, initFontPosY * factor));
+				// resize event is not implemented yet
+				//text.setCharacterSize(static_cast<unsigned int>(initFontSize * factor));
+				//text.setPosition(sf::Vector2f(initFontPosX * factor, initFontPosY * factor));
 
 				sf::FloatRect visibleArea(0, 0, event.size.width, event.size.height);
 				window.setView(sf::View(visibleArea));
@@ -154,7 +204,8 @@ int main()
 		this_thread::sleep_for(chrono::milliseconds(GUIResponseInterval));
 		window.clear();
 		window.draw(background);
-		window.draw(text);
+		for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {window.draw(rhs); });
+		for_each(text.begin(), text.end(), [&](sf::Text &rhs) {window.draw(rhs); });
 		window.display();
 	}
 	
