@@ -1,4 +1,4 @@
-/**************************************************************
+Ôªø/**************************************************************
  *  Filename:    NewTimer.cpp
  *  Copyright:   All rights reserved
  *
@@ -119,12 +119,12 @@ int main()
 	background.setFillColor(sf::Color(102, 102, 102));
 
 	vector<pair<wstring, tuple<unsigned int, float, float, float, sf::Color>>> texts = {    // tuple<fontsize, posX, posY, rot, color>
-		{ L"–° ±",	{ 55,150, 20,  0,sf::Color::White } },
-		{ L"∑÷÷”",	{ 55,150, 80,  0,sf::Color::White } },
-		{ L"√Î",		{ 55, 80,140,  0,sf::Color::White } },
-		{ L"∫¡√Î",	{ 20,100,200,  0,sf::Color::White } },
-		{ L"√˛",		{ 55,  0,  0,  0,sf::Color::White } },
-		{ L"”„",		{ 55,  0, 50,  0,sf::Color::White } },
+		{ L"Â∞èÊó∂",	{ 55,150, 20,  0,sf::Color::White } },
+		{ L"ÂàÜÈíü",	{ 55,150, 80,  0,sf::Color::White } },
+		{ L"Áßí",		{ 55, 80,140,  0,sf::Color::White } },
+		{ L"ÊØ´Áßí",	{ 20,100,200,  0,sf::Color::White } },
+		{ L"Êë∏",		{ 55,  0,  0,  0,sf::Color::White } },
+		{ L"È±º",		{ 55,  0, 50,  0,sf::Color::White } },
 		{ L"RESET", { 55,600,200,270,sf::Color::White } }
 	};
 
@@ -184,15 +184,15 @@ int main()
 			{
 				status = SWITCH;
 				cv.notify_one();
-				if (text[4].getString() == L"√˛")
+				if (text[4].getString() == L"Êë∏")
 				{
-					text[4].setString(L"º¶");
-					text[5].setString(L"—™");
+					text[4].setString(L"È∏°");
+					text[5].setString(L"Ë°Ä");
 				}
 				else
 				{
-					text[4].setString(L"√˛");
-					text[5].setString(L"”„");
+					text[4].setString(L"Êë∏");
+					text[5].setString(L"È±º");
 				}
 			}
 			else if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) // reset time
