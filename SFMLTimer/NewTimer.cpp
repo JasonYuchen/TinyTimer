@@ -1,3 +1,11 @@
+/**************************************************************
+ *  Filename:    NewTimer.cpp
+ *  Copyright:   All rights reserved
+ *
+ *  @author:     Jason
+ *  @version     v0.02
+ **************************************************************/
+
 #include <thread>
 #include <condition_variable>
 #include <chrono>
@@ -16,13 +24,14 @@ using namespace std;
 condition_variable cv;
 mutex mtx;
 sf::Time curTime;
-int eventFlag = 0;                       //avoid supurious wake
+enum eventflag { NONE, SWITCH, RESET };
+eventflag status = NONE;                 //avoid supurious wake
 const size_t TimerInterval = 1000;       //timer frequency = 1/1000ms = 1Hz
 const size_t GUIResponseInterval = 50;   //GUI responses per 50ms
 
 bool eventPred()
 {
-	return eventFlag == 1;
+	return status != NONE;
 }
 
 void Timer()
@@ -33,22 +42,32 @@ void Timer()
 	unique_lock<mutex> lock(mtx);
 	while (true)
 	{
-		if (cv.wait_for(lock, chrono::milliseconds(TimerInterval), eventPred) == false)   //over 1s
+		if (cv.wait_for(lock, chrono::milliseconds(TimerInterval), eventPred) == false)   // over 1s
 		{
 			auto t = clk.getElapsedTime();
 			clk.restart();
 			timer[flag] += t;
 			curTime = timer[flag];
+			status = NONE;
 		}
-		else                                                                     //event occurs
+		else                                                                              // event occurs
 		{
-			auto t = clk.getElapsedTime();
-			clk.restart();
-			timer[flag] += t;
-			++flag;
-			flag %= 2;
-			curTime = timer[flag];
-			eventFlag = 0;
+			if (status == SWITCH)
+			{
+				auto t = clk.getElapsedTime();
+				clk.restart();
+				timer[flag] += t;
+				++flag;
+				flag %= 2;
+				curTime = timer[flag];
+			}
+			else if (status == RESET)
+			{
+				timer[0] = sf::Time();
+				timer[1] = sf::Time();
+				curTime = timer[flag];
+			}
+			status = NONE;
 		}
 	}
 }
@@ -93,13 +112,13 @@ int main()
 {
 	const size_t initFontSize = 55;
 	const size_t initFontPosX = 50, initFontPosY = 90;
-	const size_t initBackGroundSizeX = 720, initBackGroundSizeY = 405;
+	const size_t initBackGroundSizeX = 720, initBackGroundSizeY = 540;
 
 	sf::RenderWindow window(sf::VideoMode(initBackGroundSizeX, initBackGroundSizeY), "TinyTimer");
 	sf::RectangleShape background(sf::Vector2f(initBackGroundSizeX, initBackGroundSizeY));
 	background.setFillColor(sf::Color(102, 102, 102));
 
-	vector<pair<wstring, tuple<unsigned int, float, float, float, sf::Color>>> texts = {  // tuple<fontsize, posX, posY, rot, color>
+	vector<pair<wstring, tuple<unsigned int, float, float, float, sf::Color>>> texts = {    // tuple<fontsize, posX, posY, rot, color>
 		{ L"Ð¡Ê±",	{ 55,150, 20,  0,sf::Color::White } },
 		{ L"·ÖÖÓ",	{ 55,150, 80,  0,sf::Color::White } },
 		{ L"Ãë",		{ 55, 80,140,  0,sf::Color::White } },
@@ -161,9 +180,9 @@ int main()
 			{
 				window.close();
 			}
-			else if (event.type == sf::Event::MouseButtonReleased)
+			else if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left)  // switch status
 			{
-				eventFlag = 1;
+				status = SWITCH;
 				cv.notify_one();
 				if (text[4].getString() == L"Ãþ")
 				{
@@ -176,29 +195,36 @@ int main()
 					text[5].setString(L"Óã");
 				}
 			}
+			else if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) // reset time
+			{
+				status = RESET;
+				cv.notify_one();
+			}
 			else if (event.type == sf::Event::Resized)
 			{
 				auto width = event.size.width;
 				auto height = event.size.height;
-				auto align = width;
-				auto factor = 1.0;
-				if (width * 9 > height * 16)   //display in 16:9
+				//auto align = width;
+				//auto factor = 1.0;
+				if (width * 3 > height * 4)   //display in 16:9
 				{
-					align = height;
-					factor = static_cast<double>(align) / initBackGroundSizeY;
+					//align = height;
+					//factor = static_cast<double>(align) / initBackGroundSizeY;
+					window.setSize(sf::Vector2u(height * 4 / 3, height));
 				}
 				else
 				{
-					align = width;
-					factor = static_cast<double>(align) / initBackGroundSizeX;
+					//align = width;
+					//factor = static_cast<double>(align) / initBackGroundSizeX;
+					window.setSize(sf::Vector2u(width, width * 3 / 4));
 				}
-				background.setScale(sf::Vector2f(initBackGroundSizeX * factor, initBackGroundSizeY * factor));
+				//background.setScale(sf::Vector2f(initBackGroundSizeX * factor, initBackGroundSizeY * factor));
 				// resize event is not implemented yet
 				//text.setCharacterSize(static_cast<unsigned int>(initFontSize * factor));
 				//text.setPosition(sf::Vector2f(initFontPosX * factor, initFontPosY * factor));
 
-				sf::FloatRect visibleArea(0, 0, event.size.width, event.size.height);
-				window.setView(sf::View(visibleArea));
+				//sf::FloatRect visibleArea(0, 0, event.size.width, event.size.height);
+				//window.setView(sf::View(visibleArea));
 			}
 		}
 		this_thread::sleep_for(chrono::milliseconds(GUIResponseInterval));
