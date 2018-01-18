@@ -1,4 +1,4 @@
-/**************************************************************
+Ôªø/**************************************************************
  *  Filename:    NewTimer.cpp
  *  Copyright:   All rights reserved
  *
@@ -27,7 +27,7 @@ sf::Time curTime;
 enum eventflag { NONE, SWITCH, RESET };
 eventflag status = NONE;                 //avoid supurious wake
 const size_t TimerInterval = 1000;       //timer frequency = 1/1000ms = 1Hz
-const size_t GUIResponseInterval = 50;   //GUI responses per 50ms
+const size_t GUIResponseInterval = 75;   //GUI responses per 50ms
 
 bool eventPred()
 {
@@ -112,20 +112,24 @@ int main()
 {
 	const size_t initFontSize = 55;
 	const size_t initFontPosX = 50, initFontPosY = 90;
-	const size_t initBackGroundSizeX = 720, initBackGroundSizeY = 540;
+	const size_t initBackGroundSizeX = 1600, initBackGroundSizeY = 900;
 
 	sf::RenderWindow window(sf::VideoMode(initBackGroundSizeX, initBackGroundSizeY), "TinyTimer");
+	window.setSize(sf::Vector2u(480, 270));
 	sf::RectangleShape background(sf::Vector2f(initBackGroundSizeX, initBackGroundSizeY));
 	background.setFillColor(sf::Color(102, 102, 102));
+	sf::RectangleShape reset(sf::Vector2f(480, initBackGroundSizeY));
+	reset.setFillColor(sf::Color(64, 64, 64));
+	reset.setPosition(sf::Vector2f(1120,0));
 
 	vector<pair<wstring, tuple<unsigned int, float, float, float, sf::Color>>> texts = {    // tuple<fontsize, posX, posY, rot, color>
-		{ L"–° ±",	{ 55,150, 20,  0,sf::Color::White } },
-		{ L"∑÷÷”",	{ 55,150, 80,  0,sf::Color::White } },
-		{ L"√Î",		{ 55, 80,140,  0,sf::Color::White } },
-		{ L"∫¡√Î",	{ 20,100,200,  0,sf::Color::White } },
-		{ L"√˛",		{ 55,  0,  0,  0,sf::Color::White } },
-		{ L"”„",		{ 55,  0, 50,  0,sf::Color::White } },
-		{ L"RESET", { 55,600,200,270,sf::Color::White } }
+		{ L"Â∞èÊó∂",	{ 220, 620, 105,  0,sf::Color::White } },
+		{ L"ÂàÜÈíü",	{ 120, 810, 360,  0,sf::Color::White } },
+		{ L"Áßí",		{ 330, 755, 485,  0,sf::Color::White } },
+		{ L"ÊØ´Áßí",	{  65, 500, 360,  0,sf::Color::White } },
+		{ L"Êë∏",		{ 200, 160,  30,  0,sf::Color::White } },
+		{ L"È±º",		{ 200, 160, 200,  0,sf::Color::White } },
+		{ L"RESET", { 240,1200, 740,270,sf::Color::White } }
 	};
 
 	sf::Font font;
@@ -138,8 +142,9 @@ int main()
 
 	// init texts' font, fontsize, position, rotation, color
 	auto i = 0;
-	for_each(text.begin(), text.end(), [&](sf::Text &rhs) {
+	std::for_each(text.begin(), text.end(), [&](sf::Text &rhs) {
 		rhs.setFont(font); 
+		rhs.setStyle(sf::Text::Bold);
 		rhs.setCharacterSize(std::get<0>(texts[i].second));
 		rhs.setPosition(sf::Vector2f(std::get<1>(texts[i].second), std::get<2>(texts[i].second)));
 		rhs.setRotation(std::get<3>(texts[i].second));
@@ -148,20 +153,23 @@ int main()
 		++i;
 	});
 	i = 0;
-	for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
+	std::for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
 		rhs.setFont(font);
+		rhs.setStyle(sf::Text::Bold);
 		rhs.setCharacterSize(std::get<0>(texts[i].second));
-		rhs.setPosition(sf::Vector2f(std::get<1>(texts[i].second) - 50, std::get<2>(texts[i].second)));
+		rhs.setPosition(sf::Vector2f(std::get<1>(texts[i].second) - std::get<0>(texts[i].second), std::get<2>(texts[i].second)));
 		rhs.setRotation(std::get<3>(texts[i].second));
 		rhs.setFillColor(std::get<4>(texts[i].second));
 		++i;
 	});
-
+	timetext[3].setPosition(sf::Vector2f(std::get<1>(texts[3].second) - 1.5 * std::get<0>(texts[3].second), std::get<2>(texts[3].second)));          //ms
+	timetext[2].setPosition(sf::Vector2f(std::get<1>(texts[2].second) - 1.9 * std::get<0>(texts[2].second), std::get<2>(texts[2].second) - 180));    //s
+	timetext[2].setCharacterSize(1.7 * std::get<0>(texts[2].second));
 	thread timerThread(Timer);
 	timerThread.detach();
 	
 	auto time = sfTimeToHMS(curTime);
-
+	
 	while (window.isOpen())
 	{
 		sf::Event event;
@@ -169,7 +177,7 @@ int main()
 
 		// update time texts
 		i = 0;
-		for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
+		std::for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
 			rhs.setString(time[i]);
 			++i;
 		});
@@ -184,15 +192,15 @@ int main()
 			{
 				status = SWITCH;
 				cv.notify_one();
-				if (text[4].getString() == L"√˛")
+				if (text[4].getString() == L"Êë∏")
 				{
-					text[4].setString(L"º¶");
-					text[5].setString(L"—™");
+					text[4].setString(L"È∏°");
+					text[5].setString(L"Ë°Ä");
 				}
 				else
 				{
-					text[4].setString(L"√˛");
-					text[5].setString(L"”„");
+					text[4].setString(L"Êë∏");
+					text[5].setString(L"È±º");
 				}
 			}
 			else if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) // reset time
@@ -206,17 +214,17 @@ int main()
 				auto height = event.size.height;
 				//auto align = width;
 				//auto factor = 1.0;
-				if (width * 3 > height * 4)   //display in 16:9
+				if (width * 9 > height * 16)   //display in 16:9
 				{
 					//align = height;
 					//factor = static_cast<double>(align) / initBackGroundSizeY;
-					window.setSize(sf::Vector2u(height * 4 / 3, height));
+					window.setSize(sf::Vector2u(height * 16 / 9, height));
 				}
 				else
 				{
 					//align = width;
 					//factor = static_cast<double>(align) / initBackGroundSizeX;
-					window.setSize(sf::Vector2u(width, width * 3 / 4));
+					window.setSize(sf::Vector2u(width, width * 9 / 16));
 				}
 				//background.setScale(sf::Vector2f(initBackGroundSizeX * factor, initBackGroundSizeY * factor));
 				// resize event is not implemented yet
@@ -230,8 +238,9 @@ int main()
 		this_thread::sleep_for(chrono::milliseconds(GUIResponseInterval));
 		window.clear();
 		window.draw(background);
-		for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {window.draw(rhs); });
-		for_each(text.begin(), text.end(), [&](sf::Text &rhs) {window.draw(rhs); });
+		window.draw(reset);
+		std::for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {window.draw(rhs); });
+		std::for_each(text.begin(), text.end(), [&](sf::Text &rhs) {window.draw(rhs); });
 		window.display();
 	}
 	
