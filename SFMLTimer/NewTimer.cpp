@@ -26,6 +26,7 @@ mutex mtx;
 sf::Time curTime;
 enum eventflag { NONE, SWITCH, RESET };
 eventflag status = NONE;                 //avoid supurious wake
+eventflag mousePosition = NONE;
 const size_t TimerInterval = 1000;       //timer frequency = 1/1000ms = 1Hz
 const size_t GUIResponseInterval = 75;   //GUI responses per 50ms
 
@@ -112,24 +113,32 @@ int main()
 {
 	const size_t initFontSize = 55;
 	const size_t initFontPosX = 50, initFontPosY = 90;
-	const size_t initBackGroundSizeX = 1600, initBackGroundSizeY = 900;
+	const size_t initBackGroundSizeX = 800, initBackGroundSizeY = 500;
+	const size_t resetSizeX = 100, resetSizeY = initBackGroundSizeY;
+	const size_t switchAreaSizeX = 500, switchAreaSizeY = initBackGroundSizeY;
 
 	sf::RenderWindow window(sf::VideoMode(initBackGroundSizeX, initBackGroundSizeY), "TinyTimer");
-	window.setSize(sf::Vector2u(480, 270));
+	window.setSize(sf::Vector2u(initBackGroundSizeX/2, initBackGroundSizeY/2));
+
 	sf::RectangleShape background(sf::Vector2f(initBackGroundSizeX, initBackGroundSizeY));
 	background.setFillColor(sf::Color(102, 102, 102));
-	sf::RectangleShape reset(sf::Vector2f(480, initBackGroundSizeY));
+
+	sf::RectangleShape reset(sf::Vector2f(resetSizeX, resetSizeY));
 	reset.setFillColor(sf::Color(64, 64, 64));
-	reset.setPosition(sf::Vector2f(1120,0));
+	reset.setPosition(sf::Vector2f(initBackGroundSizeX-resetSizeX,0));
+
+	sf::RectangleShape switchArea(sf::Vector2f(switchAreaSizeX, switchAreaSizeY));
+	switchArea.setFillColor(sf::Color(64, 64, 64));
+	switchArea.setPosition(sf::Vector2f(100, 0));
 
 	vector<pair<wstring, tuple<unsigned int, float, float, float, sf::Color>>> texts = {    // tuple<fontsize, posX, posY, rot, color>
-		{ L"小时",	{ 220, 620, 105,  0,sf::Color::White } },
-		{ L"分钟",	{ 120, 810, 360,  0,sf::Color::White } },
-		{ L"秒",		{ 330, 755, 485,  0,sf::Color::White } },
-		{ L"毫秒",	{  65, 500, 360,  0,sf::Color::White } },
-		{ L"摸",		{ 200, 160,  30,  0,sf::Color::White } },
-		{ L"鱼",		{ 200, 160, 200,  0,sf::Color::White } },
-		{ L"RESET", { 240,1200, 740,270,sf::Color::White } }
+		{ L"小时",	{ 120, 330,  70,  0,sf::Color::White } },
+		{ L"分钟",	{  75, 420, 220,  0,sf::Color::White } },
+		{ L"秒",		{ 160, 410, 300,  0,sf::Color::White } },
+		{ L"毫秒",	{  40, 260, 200,  0,sf::Color::White } },
+		{ L"摸",		{ 120,  80,  20,  0,sf::Color::White } },
+		{ L"鱼",		{ 120,  80, 133,  0,sf::Color::White } },
+		{ L"RESET", { 150, 640, 440,270,sf::Color::White } }
 	};
 
 	sf::Font font;
@@ -163,13 +172,13 @@ int main()
 		++i;
 	});
 	timetext[3].setPosition(sf::Vector2f(std::get<1>(texts[3].second) - 1.5 * std::get<0>(texts[3].second), std::get<2>(texts[3].second)));          //ms
-	timetext[2].setPosition(sf::Vector2f(std::get<1>(texts[2].second) - 1.9 * std::get<0>(texts[2].second), std::get<2>(texts[2].second) - 180));    //s
+	timetext[2].setPosition(sf::Vector2f(std::get<1>(texts[2].second) - 2.0 * std::get<0>(texts[2].second), std::get<2>(texts[2].second) - 100));    //s
 	timetext[2].setCharacterSize(1.7 * std::get<0>(texts[2].second));
+
 	thread timerThread(Timer);
 	timerThread.detach();
-	
 	auto time = sfTimeToHMS(curTime);
-	
+
 	while (window.isOpen())
 	{
 		sf::Event event;
@@ -182,13 +191,35 @@ int main()
 			++i;
 		});
 
+		// get cursor position
+		sf::Vector2f mouse{ sf::Mouse::getPosition(window) };
+
+		// wheather in switchArea or reset
+		sf::Vector2f windowSize{ window.getSize() };
+		if (mouse.x/windowSize.x > 100.0/800.0 && mouse.x / windowSize.x < 600.0/800.0 && mouse.y > 0 && mouse.y < windowSize.y)
+		{
+			switchArea.setFillColor(sf::Color(64, 64, 64));
+			mousePosition = SWITCH;
+		}
+		else if (mouse.x / windowSize.x > 700.0 / 800.0 && mouse.x < windowSize.x && mouse.y > 0 && mouse.y < windowSize.y)
+		{
+			reset.setFillColor(sf::Color(169, 169, 169));
+			mousePosition = RESET;
+		}
+		else
+		{
+			reset.setFillColor(sf::Color(64, 64, 64));
+			switchArea.setFillColor(sf::Color(102, 102, 102));
+			mousePosition = NONE;
+		}
+
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
 			{
 				window.close();
 			}
-			else if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left)  // switch status
+			else if (event.type == sf::Event::MouseButtonReleased && mousePosition == SWITCH)  // switch status
 			{
 				status = SWITCH;
 				cv.notify_one();
@@ -203,7 +234,7 @@ int main()
 					text[5].setString(L"鱼");
 				}
 			}
-			else if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) // reset time
+			else if (event.type == sf::Event::MouseButtonReleased && mousePosition == RESET) // reset time
 			{
 				status = RESET;
 				cv.notify_one();
@@ -214,19 +245,20 @@ int main()
 				auto height = event.size.height;
 				//auto align = width;
 				//auto factor = 1.0;
-				if (width * 9 > height * 16)   //display in 16:9
+				if (width * 5 > height * 8)   //display in 16:9
 				{
 					//align = height;
 					//factor = static_cast<double>(align) / initBackGroundSizeY;
-					window.setSize(sf::Vector2u(height * 16 / 9, height));
+					window.setSize(sf::Vector2u(height * 8 / 5, height));
 				}
 				else
 				{
 					//align = width;
 					//factor = static_cast<double>(align) / initBackGroundSizeX;
-					window.setSize(sf::Vector2u(width, width * 9 / 16));
+					window.setSize(sf::Vector2u(width, width * 5 / 8));
 				}
-				//background.setScale(sf::Vector2f(initBackGroundSizeX * factor, initBackGroundSizeY * factor));
+				
+				//reset.setScale(sf::Vector2f(factor, factor));
 				// resize event is not implemented yet
 				//text.setCharacterSize(static_cast<unsigned int>(initFontSize * factor));
 				//text.setPosition(sf::Vector2f(initFontPosX * factor, initFontPosY * factor));
@@ -235,13 +267,19 @@ int main()
 				//window.setView(sf::View(visibleArea));
 			}
 		}
-		this_thread::sleep_for(chrono::milliseconds(GUIResponseInterval));
+
+
+
 		window.clear();
 		window.draw(background);
+		window.draw(switchArea);
 		window.draw(reset);
 		std::for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {window.draw(rhs); });
 		std::for_each(text.begin(), text.end(), [&](sf::Text &rhs) {window.draw(rhs); });
 		window.display();
+
+
+		this_thread::sleep_for(chrono::milliseconds(GUIResponseInterval));
 	}
 	
 	return 0;
