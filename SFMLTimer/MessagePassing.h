@@ -1,8 +1,13 @@
-﻿/**************************************************************
+#pragma once
+/**************************************************************
 *  Filename:    MessagePassing.h
-*  
+*
+*  based on :
 *  <C++ Concurrency In Action> appendix C
 *  Anthony Williams
+*
+*  modified : 
+*  2018/1/22   Jason   Support timed_out in class queue
 **************************************************************/
 
 #pragma once
@@ -24,7 +29,18 @@ namespace messaging
 		Msg contents;
 		explicit wrapped_message(const Msg &contents_) :contents(contents_) {}
 	};
-	                                
+
+	class close_queue {};                                         // For closing the queue
+	struct timed_out {};
+
+	template<>
+	struct wrapped_message<timed_out> : message_base
+	{
+		timed_out contents;
+		wrapped_message() :contents() {}
+		explicit wrapped_message(const timed_out &contents_) :contents(contents_) {}
+	};
+
 	class queue                                                   // Message queue
 	{
 	private:
@@ -47,6 +63,20 @@ namespace messaging
 			q.pop();
 			return res;
 		}
+		std::shared_ptr<message_base> wait_for_and_pop(const std::chrono::duration<int, std::milli> &timeout)
+		{
+			std::unique_lock<std::mutex> lk(m);
+			if (c.wait_for(lk, timeout, [&]() {return !q.empty(); }) == false)
+			{
+				return std::shared_ptr<message_base>(new wrapped_message<timed_out>());
+			}
+			else
+			{
+				auto res = q.front();
+				q.pop();
+				return res;
+			}
+		}
 	};
 
 	class sender
@@ -56,79 +86,13 @@ namespace messaging
 	public:
 		sender() :q(nullptr) {}                                   // Default-constructed sender has no queue
 		explicit sender(queue *q_) :q(q_) {}
+
 		template<typename Message>
 		void send(const Message &msg)                             // Sending pushes message on the queue
 		{
 			if (q)
 			{
 				q->push(msg);
-			}
-		}
-	};
-
-	class receiver
-	{
-	private:
-		queue q;                                                  // A receiver owns the queue
-	public:
-		operator sender()                                         // Implicit conversion to a sender
-		{
-			return sender(&q);
-		}
-		dispatcher wait()                                         // Waiting for a queue creates a dispatcher
-		{
-			return dispatcher(&q);
-		}
-	};
-
-	class close_queue {};                                         // For closing the queue
-
-	class dispatcher
-	{
-	private:
-		queue *q;
-		bool chained;
-		dispatcher(const dispatcher &) = delete;
-		dispatcher &operator=(const dispatcher &) = delete;
-
-		template<typename Dispatcher, typename Msg. typename Func>
-		friend class TemplateDispatcher;                          // Allow TemplateDispatcher instances to access the internals
-
-		void wait_and_dispatch()
-		{
-			for (;;)                                              // Loop, waiting for and dispatching messages
-			{
-				auto msg = q->wait_and_pop();
-				dispatch(msg);
-			}
-		}
-		bool dispatch(const std::shared_ptr<message_base> &msg)
-		{
-			if (dynamic_cast<wrapped_message<close_queue>*>(msg.get()))
-			{
-				throw close_queue();
-			}
-			return false;                                         // false indicate the message was unhandled
-		}
-	public:
-		dispatcher(dispatcher &&other) : q(other.q), chained(other.chained)
-		{
-			other.chained = true;
-		}
-		explicit dispatcher(queue *q_) :q(q_), chained(false) {}
-
-		template<typename Message, typename Func>
-		TemplateDispatcher<dispatcher, Message, Func>
-		handle(Func &&f)                                          // Handle a specific type of message with a TemplateDispatcher
-		{
-			return TemplateDispatcher<dispatcher, Message, Func>(q, this, std::forward<Func>(f));
-		}
-
-		~dispatcher() noexcept(false)                             // may throw close_queue exception
-		{
-			if (!chained)
-			{
-				wait_and_dispatch();
 			}
 		}
 	};
@@ -151,7 +115,7 @@ namespace messaging
 		{
 			for (;;)
 			{
-				auto msg = q->wait_and_pop();
+				auto msg = q->wait_for_and_pop(std::chrono::milliseconds(2000));
 				if (dispatch(msg))                                // If we handle the message, break out of the loop
 					break;
 			}
@@ -160,7 +124,7 @@ namespace messaging
 		{
 			if (wrapped_message<Msg> *wrapper = dynamic_cast<wrapped_message<Msg>*>(msg.get()))
 			{
-				f(wrapper->content);                              // Check the message type and call the function
+				f(wrapper->contents);                              // Check the message type and call the function
 				return true;
 			}
 			else
@@ -180,7 +144,7 @@ namespace messaging
 
 		template<typename OtherMsg, typename OtherFunc>
 		TemplateDispatcher<TemplateDispatcher, OtherMsg, OtherFunc>
-		handle(OtherFunc &&of)                                    // Additional handlers can be chained
+			handle(OtherFunc &&of)                                    // Additional handlers can be chained
 		{
 			return TemplateDispatcher<TemplateDispatcher, OtherMsg, OtherFunc>(q, this, std::forward<OtherFunc>(of));
 		}
@@ -193,46 +157,70 @@ namespace messaging
 			}
 		}
 	};
-}
 
-class atm
-{
-	messaging::receiver incoming;
-	messaging::sender bank;
-	messaging::sender interface_hardware;
-	void (atm::*state)();
-	std::string account;
-	unsigned withdrawal_amount;
-	std::string pin;
-	void process_withdrawal()
+	class dispatcher
 	{
-		incoming.wait()
-			.handle<withdraw_ok>(
-				[&](withdraw_ok const& msg)
+	private:
+		queue *q;
+		bool chained;
+		dispatcher(const dispatcher &) = delete;
+		dispatcher &operator=(const dispatcher &) = delete;
+
+		template<typename Dispatcher, typename Msg, typename Func>
+		friend class TemplateDispatcher;                          // Allow TemplateDispatcher instances to access the internals
+
+		void wait_and_dispatch()
 		{
-			interface_hardware.send(
-				issue_money(withdrawal_amount));
-			bank.send(
-				withdrawal_processed(account, withdrawal_amount));
-			state = &atm::done_processing;
+			for (;;)                                              // Loop, waiting for and dispatching messages
+			{
+				auto msg = q->wait_for_and_pop(std::chrono::milliseconds(2000));
+				dispatch(msg);
+			}
 		}
-				)
-			.handle<withdraw_denied>(
-				[&](withdraw_denied const& msg)
+		bool dispatch(const std::shared_ptr<message_base> &msg)
 		{
-			interface_hardware.send(display_insufficient_funds());
-			state = &atm::done_processing;
+			if (dynamic_cast<wrapped_message<close_queue>*>(msg.get()))
+			{
+				throw close_queue();
+			}
+			return false;                                         // false indicate the message was unhandled
 		}
-				)
-			.handle<cancel_pressed>(
-				[&](cancel_pressed const& msg)
+	public:
+		dispatcher(dispatcher &&other) : q(other.q), chained(other.chained)
 		{
-			bank.send(
-				cancel_withdrawal(account, withdrawal_amount));
-			interface_hardware.send(
-				display_withdrawal_cancelled());
-			state = &atm::done_processing;
+			other.chained = true;
 		}
-		);
-	}
-...
+		explicit dispatcher(queue *q_) :q(q_), chained(false) {}
+
+		template<typename Message, typename Func>
+		TemplateDispatcher<dispatcher, Message, Func>
+			handle(Func &&f)                                          // Handle a specific type of message with a TemplateDispatcher
+		{
+			return TemplateDispatcher<dispatcher, Message, Func>(q, this, std::forward<Func>(f));
+		}
+
+		~dispatcher() noexcept(false)                             // may throw close_queue exception
+		{
+			if (!chained)
+			{
+				wait_and_dispatch();
+			}
+		}
+	};
+
+	class receiver
+	{
+	private:
+		queue q;                                                  // A receiver owns the queue
+	public:
+		operator sender()                                         // Implicit conversion to a sender
+		{
+			return sender(&q);
+		}
+
+		dispatcher wait()                                         // Waiting for a queue creates a dispatcher
+		{
+			return dispatcher(&q);                                // Use dispatcher-ctor, dispatcher definition should be ahead
+		}
+	};
+}
