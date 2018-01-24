@@ -1,9 +1,0 @@
-SFMLTimer
-
------------------------
-
-NewTimer.cpp 90% completed, two thread
-
-Source.cpp 50% completed, three thread with Actor model, learning <C++ Concurrency in Action>....
-
-MessagePassing.h, based on <C++ Concurrency in Action> appendix C
