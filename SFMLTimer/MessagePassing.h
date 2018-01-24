@@ -1,14 +1,14 @@
-#pragma once
-/**************************************************************
+/***********************************************************************
 *  Filename:    MessagePassing.h
 *
 *  based on :
 *  <C++ Concurrency In Action> appendix C
 *  Anthony Williams
 *
-*  modified : 
+*  modified :
 *  2018/1/22   Jason   Support timed_out in class queue
-**************************************************************/
+*  2018/1/24   Jason   Message dispatcher with optional time limit
+************************************************************************/
 
 #pragma once
 #include <mutex>
@@ -34,7 +34,7 @@ namespace messaging
 	struct timed_out {};
 
 	template<>
-	struct wrapped_message<timed_out> : message_base
+	struct wrapped_message<timed_out> : message_base              // For timed_out
 	{
 		timed_out contents;
 		wrapped_message() :contents() {}
@@ -105,6 +105,7 @@ namespace messaging
 		PreviousDispatcher *prev;
 		Func f;
 		bool chained;
+		std::chrono::duration<int, std::milli> time;
 		TemplateDispatcher(const TemplateDispatcher &) = delete;
 		TemplateDispatcher &operator=(const TemplateDispatcher &) = delete;
 
@@ -115,7 +116,11 @@ namespace messaging
 		{
 			for (;;)
 			{
-				auto msg = q->wait_for_and_pop(std::chrono::milliseconds(2000));
+				std::shared_ptr<messaging::message_base> msg;
+				if (time == std::chrono::duration<int, std::milli>())
+					msg = q->wait_and_pop();
+				else
+					msg = q->wait_for_and_pop(time);
 				if (dispatch(msg))                                // If we handle the message, break out of the loop
 					break;
 			}
@@ -124,7 +129,7 @@ namespace messaging
 		{
 			if (wrapped_message<Msg> *wrapper = dynamic_cast<wrapped_message<Msg>*>(msg.get()))
 			{
-				f(wrapper->contents);                              // Check the message type and call the function
+				f(wrapper->contents);                             // Check the message type and call the function
 				return true;
 			}
 			else
@@ -133,20 +138,22 @@ namespace messaging
 			}
 		}
 	public:
-		TemplateDispatcher(TemplateDispatcher &&other) :q(other.q), prev(other.prev), f(std::move(other.f)), chained(other.chained)
+		TemplateDispatcher(TemplateDispatcher &&other) :q(other.q), prev(other.prev), f(std::move(other.f)), chained(other.chained), time(other.time)
 		{
 			other.chained = true;
 		}
-		TemplateDispatcher(queue *q_, PreviousDispatcher *prev_, Func &&f_) :q(q_), prev(prev_), f(std::forward<Func>(f_)), chained(false)
+
+		TemplateDispatcher(queue *q_, PreviousDispatcher *prev_, Func &&f_, const std::chrono::duration<int, std::milli> &time_)
+			:q(q_), prev(prev_), f(std::forward<Func>(f_)), chained(false), time(time_)
 		{
 			prev_->chained = true;
 		}
 
 		template<typename OtherMsg, typename OtherFunc>
 		TemplateDispatcher<TemplateDispatcher, OtherMsg, OtherFunc>
-			handle(OtherFunc &&of)                                    // Additional handlers can be chained
+			handle(OtherFunc &&of)                                // Additional handlers can be chained
 		{
-			return TemplateDispatcher<TemplateDispatcher, OtherMsg, OtherFunc>(q, this, std::forward<OtherFunc>(of));
+			return TemplateDispatcher<TemplateDispatcher, OtherMsg, OtherFunc>(q, this, std::forward<OtherFunc>(of), time);
 		}
 
 		~TemplateDispatcher() noexcept(false)
@@ -163,6 +170,7 @@ namespace messaging
 	private:
 		queue *q;
 		bool chained;
+		std::chrono::duration<int, std::milli> time;
 		dispatcher(const dispatcher &) = delete;
 		dispatcher &operator=(const dispatcher &) = delete;
 
@@ -173,7 +181,7 @@ namespace messaging
 		{
 			for (;;)                                              // Loop, waiting for and dispatching messages
 			{
-				auto msg = q->wait_for_and_pop(std::chrono::milliseconds(2000));
+				auto msg = q->wait_and_pop();
 				dispatch(msg);
 			}
 		}
@@ -190,13 +198,14 @@ namespace messaging
 		{
 			other.chained = true;
 		}
-		explicit dispatcher(queue *q_) :q(q_), chained(false) {}
+		explicit dispatcher(queue *q_) :q(q_), chained(false), time() {}
+		explicit dispatcher(queue *q_, const std::chrono::duration<int, std::milli> &time_) :q(q_), chained(false), time(time_) {}
 
 		template<typename Message, typename Func>
 		TemplateDispatcher<dispatcher, Message, Func>
-			handle(Func &&f)                                          // Handle a specific type of message with a TemplateDispatcher
+			handle(Func &&f)                                      // Handle a specific type of message with a TemplateDispatcher
 		{
-			return TemplateDispatcher<dispatcher, Message, Func>(q, this, std::forward<Func>(f));
+			return TemplateDispatcher<dispatcher, Message, Func>(q, this, std::forward<Func>(f), time);
 		}
 
 		~dispatcher() noexcept(false)                             // may throw close_queue exception
@@ -221,6 +230,10 @@ namespace messaging
 		dispatcher wait()                                         // Waiting for a queue creates a dispatcher
 		{
 			return dispatcher(&q);                                // Use dispatcher-ctor, dispatcher definition should be ahead
+		}
+		dispatcher wait(const std::chrono::duration<int, std::milli> &time)
+		{
+			return dispatcher(&q, time);                          // Return a message dispatcher with time limited 
 		}
 	};
 }
