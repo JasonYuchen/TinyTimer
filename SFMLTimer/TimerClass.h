@@ -3,8 +3,9 @@
 *  Copyright:   All rights reserved
 *
 *  @author:     Jason
-*  @version     v0.9
+*  @version     v1.0
 **************************************************************/
+
 #pragma once
 #include "MessagePassing.h"
 #include <SFML\Graphics.hpp>
@@ -12,6 +13,7 @@
 #include <string>
 #include <array>
 
+// Mark the mouse position
 enum class pos { OUT, SWITCH, RESET };
 
 struct period
@@ -57,22 +59,26 @@ private:
 public:
 	timer(messaging::sender to_render_) :to_render(to_render_), flag(0) {}
 
+	// Finish run()
 	void done()
 	{
 		get_sender().send(messaging::close_queue());
 	}
 
+	// Return the message sender which sends message to the timer's receiver
 	messaging::sender get_sender()
 	{
 		return incoming;
 	}
 
+	// Event loop
 	void run()
 	{
 		try
 		{
 			for (;;)
 			{
+				// Timer waits with a time limit of 1000ms
 				incoming.wait(std::chrono::milliseconds(1000))
 					.handle<messaging::timed_out>(
 						[&](const messaging::timed_out &msg)
@@ -128,18 +134,19 @@ public:
 		initialize();
 	}
 
-	void initialize();
-
+	// Finish run()
 	void done()
 	{
 		get_sender().send(messaging::close_queue());
 	}
 
+	// Return the message sender which sends message to the render's receiver
 	messaging::sender get_sender()
 	{
 		return incoming;
 	}
 
+	// Event loop
 	void run()
 	{
 		try
@@ -148,12 +155,12 @@ public:
 			displayall();
 			for (;;)
 			{
+				// Render waits for an event
 				incoming.wait()
 					.handle<period>(
 						[&](const period &msg)
 				{
 					setTime(msg.curTime);
-					//draw all things per 1s(timed_out)
 				}
 						)
 					.handle<highlight>(
@@ -170,7 +177,6 @@ public:
 						switchArea.setFillColor(sf::Color(102, 102, 102));
 						break;
 					}
-					//highlight specific area and draw all
 				}
 						)
 					.handle<unhighlight>(
@@ -178,7 +184,6 @@ public:
 				{
 					switchArea.setFillColor(sf::Color(102, 102, 102));
 					resetArea.setFillColor(sf::Color(64, 64, 64));
-					//unhighlight specific area and draw all
 				}
 						)
 					.handle<switchtimer>(
@@ -186,7 +191,6 @@ public:
 				{
 					switchText();
 					setTime(msg.curTime);
-					//ji xue <-> mo yu and draw all
 				}
 						)
 					.handle<resettimer>(
@@ -209,38 +213,15 @@ public:
 		}
 	}
 
-	void displayall()
-	{
-		window.clear();
-		window.draw(backgroundArea);
-		window.draw(switchArea);
-		window.draw(resetArea);
-		std::for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {window.draw(rhs); });
-		std::for_each(text.begin(), text.end(), [&](sf::Text &rhs) {window.draw(rhs); });
-		window.display();
-	}
+	// Refresh the window and display all elements
+	void displayall();
 
-	void setTime(const sf::Time &t)
-	{
-		auto time = sfTimeToHMS(t);
-		auto i = 0;
-		std::for_each(timetext.begin(), timetext.end(), [&](sf::Text &rhs) {
-			rhs.setString(time[i]);
-			++i;
-		});
-	}
+	// Refresh time values
+	void setTime(const sf::Time &t);
 
-	void switchText()
-	{
-		if (text[4].getString() == L"摸")
-		{
-			text[4].setString(L"鸡");
-			text[5].setString(L"血");
-		}
-		else
-		{
-			text[4].setString(L"摸");
-			text[5].setString(L"鱼");
-		}
-	}
+	// Switch between "摸鱼" and "鸡血"
+	void switchText();
+
+	// Init all elements
+	void initialize();
 };
