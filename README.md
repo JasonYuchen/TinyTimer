@@ -19,6 +19,6 @@ SFMLTimer for having fun with SFML
 - v0.02 new timer, low CPU usage, try multithread after reading <Cpp Concurrency in Action>
 - v0.10 more friendly UI, implemented two button for switch and reset
 
-## Others:
+## Others
 
 Based on SFML, tested on windows 10 with MSVC
