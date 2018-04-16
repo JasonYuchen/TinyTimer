@@ -13,6 +13,8 @@ Quick Start
 * test/test.gif
 * release/SFMLTimer_ver2.0.exe on Windows
 
+![img](https://github.com/JasonYuchen/TinyTimer/test/test.gif)
+
 Discussing
 -------------------------
 - email: jasonyuchen@foxmail.com
