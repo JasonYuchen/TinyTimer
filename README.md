@@ -1,7 +1,9 @@
 SFMLTimer - a GUI timer based on SFML
 =========================
 
-A desktop timer, easy to use. Have fun!
+A desktop timer based on C++11 and SFML for learning <C++ Concurrency in Action>
+Inspired by @GPBeta(http://www.gpbeta.com/post/develop/moyu/)
+Have fun!
 
 Requirements
 -------------------------
@@ -13,7 +15,7 @@ Quick Start
 * test/test.gif
 * release/SFMLTimer_ver2.0.exe on Windows
 
-![img](https://github.com/JasonYuchen/TinyTimer/test/test.gif)
+![img](https://github.com/JasonYuchen/TinyTimer/blob/master/test/test.gif)
 
 Discussing
 -------------------------
